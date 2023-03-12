@@ -148,6 +148,7 @@ daily %>%
 exceedances <- daily %>%
   filter(percent.recovery >= threshold &
            value > limits.vec[as.character(variable)])
+
 head(exceedances)
 tail(exceedances)
 
@@ -188,3 +189,25 @@ hourly %>%
   geom_hline(data=limits.hourly, mapping=aes(yintercept=value), linetype=2, col = 2)+
   scale_x_chron(format="%d.%m")+
   theme(axis.text.x=element_text(angle=30, hjust=1))
+
+(limits.vec_O3 <- with(limits.hourly, setNames(value, variable)))
+
+exceedances_O3 <- hourly %>%
+  filter(percent.recovery >= threshold &
+           value > limits.vec_O3[as.character(variable)])
+
+
+
+head(exceedances_O3)
+tail(exceedances_O3)
+
+
+exceedances_O3 %>%
+  count(site, variable)
+
+
+exceedances_O3 %>%
+  mutate(month = months(date)) %>%
+  count(site, variable, month)
+
+write.csv2(exceedances_O3, file="exceedances_O3.csv", row.names=FALSE)
