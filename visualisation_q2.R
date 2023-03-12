@@ -100,3 +100,91 @@ lf %>%
                 fun.max=Percentile(75))+
   ggtitle("LAU")
 
+
+## Creating summaries: Exceedances of daily limit values
+
+limits.daily <- data.frame(value=c(100,80,8,50),
+                           variable=c("SO2","NO2","CO","PM10"))
+
+
+
+daily <- lf %>%
+  filter(variable %in% limits.daily[["variable"]]) %>% # select variables
+  mutate(date = dates(datetime)) %>%                   # get the date value
+  group_by(site, date, variable) %>%
+  summarize(percent.recovery = length(na.omit(value))/length(value)*1e2,
+            value = mean(value, na.rm=TRUE)) %>%
+  ungroup()                                            # undo grouping for future use
+
+
+threshold <- 75
+
+daily %>%
+  filter(percent.recovery < threshold) %>%
+  count(site, variable)
+
+filter(daily, percent.recovery < threshold & variable=="PM10")
+
+daily %>%
+  filter(percent.recovery >= threshold) %>%
+  ggplot+
+  facet_grid(variable~site, scale="free_y")+  
+  geom_line(aes(x=date, y=value))+
+  geom_hline(data=limits.daily, mapping=aes(yintercept=value), linetype=2, col = 2)+
+  scale_x_chron(format="%d.%m")+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
+
+
+daily %>%
+  filter(percent.recovery >= threshold) %>%
+  ggplot+
+  facet_grid(variable~site, scale="free_y")+  
+  geom_line(aes(x=value), stat="ecdf")+
+  geom_point(aes(x=value), stat="ecdf")+
+  geom_vline(data=limits.daily, mapping=aes(xintercept=value), linetype=2, col = 2)
+
+(limits.vec <- with(limits.daily, setNames(value, variable)))
+
+exceedances <- daily %>%
+  filter(percent.recovery >= threshold &
+           value > limits.vec[as.character(variable)])
+head(exceedances)
+tail(exceedances)
+
+
+exceedances %>%
+  count(site, variable)
+
+
+exceedances %>%
+  mutate(month = months(date)) %>%
+  count(site, variable, month)
+
+write.csv2(exceedances, file="exceedances.csv", row.names=FALSE)
+
+## Annual exceedances
+
+limits.annual <- data.frame(value = c(30, 30, 20), variable = c("SO2","NO2","PM10"))
+
+## Ozone hourly limit
+limits.hourly <- data.frame(value = c(120), variable = c("O3"))
+
+
+
+hourly <- lf %>%
+  filter(variable %in% limits.hourly[["variable"]]) %>% # select variables
+  mutate(date = as.Date(datetime)) %>%                  # get the date value
+  mutate(hour = format(datetime, format = "%H")) %>%    # get the hour value
+  group_by(site, date, hour, variable) %>%
+  summarize(percent.recovery = length(na.omit(value))/length(value)*1e2,
+            value = mean(value, na.rm=TRUE)) %>%
+  ungroup() 
+
+hourly %>%
+  filter(percent.recovery >= threshold) %>%
+  ggplot+
+  facet_grid(variable~site, scale="free_y")+  
+  geom_line(aes(x=date, y=value))+
+  geom_hline(data=limits.hourly, mapping=aes(yintercept=value), linetype=2, col = 2)+
+  scale_x_chron(format="%d.%m")+
+  theme(axis.text.x=element_text(angle=30, hjust=1))
